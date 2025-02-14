@@ -7,7 +7,8 @@ public class MapGenerator : MonoBehaviour
     private enum EDrawMode
     {
         NoiseMap,
-        ColorMap
+        ColorMap,
+        Mesh
     }
 
     [Header("Noise")]
@@ -35,6 +36,7 @@ public class MapGenerator : MonoBehaviour
     {
         var noiseMap = Noise.GenerateNoiseMap(m_mapWidth, m_mapHeight, m_seed, m_noiseScale, m_octaves, m_persistance, m_lacunarity, m_offset);
 
+        //Color Map ¼³Á¤
         var colorMap = new Color[m_mapWidth * m_mapHeight];
         for (int y = 0; y < m_mapHeight; y++)
         {
@@ -53,6 +55,7 @@ public class MapGenerator : MonoBehaviour
             }
         }
 
+        // Modeº° Draw
         var display = FindObjectOfType<MapDisplay>();
         if (m_drawMode == EDrawMode.NoiseMap)
         {
@@ -61,6 +64,10 @@ public class MapGenerator : MonoBehaviour
         else if(m_drawMode == EDrawMode.ColorMap)
         {
             display.DrawTexture(TextureGenerator.TextureFromColorMap(colorMap, m_mapWidth, m_mapHeight));
+        }
+        else if(m_drawMode == EDrawMode.Mesh)
+        {
+            display.DrawMesh(MeshGenerator.GenerateTerrainMesh(noiseMap), TextureGenerator.TextureFromColorMap(colorMap, m_mapWidth, m_mapHeight));
         }
     }
 
