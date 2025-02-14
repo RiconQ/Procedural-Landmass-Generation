@@ -27,6 +27,10 @@ public class MapGenerator : MonoBehaviour
     [Space, Header("Terrain")]
     [SerializeField] private TerrainType[] m_regions;
 
+    [Space, Header("Mesh")]
+    [SerializeField] private float m_meshHeightMultiplier;
+    [SerializeField] private AnimationCurve m_meshHeightCurve;
+
     [Space, Header("Editor")]
     [SerializeField] private bool m_autoUpdate = true;
     [SerializeField] private EDrawMode m_drawMode;
@@ -67,7 +71,7 @@ public class MapGenerator : MonoBehaviour
         }
         else if(m_drawMode == EDrawMode.Mesh)
         {
-            display.DrawMesh(MeshGenerator.GenerateTerrainMesh(noiseMap), TextureGenerator.TextureFromColorMap(colorMap, m_mapWidth, m_mapHeight));
+            display.DrawMesh(MeshGenerator.GenerateTerrainMesh(noiseMap, m_meshHeightMultiplier, m_meshHeightCurve), TextureGenerator.TextureFromColorMap(colorMap, m_mapWidth, m_mapHeight));
         }
     }
 
