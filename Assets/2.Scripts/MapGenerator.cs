@@ -31,7 +31,7 @@ public class MapGenerator : MonoBehaviour
     [Header("LOD")]
     [Tooltip("숫자가 작아질수록 디테일업")]
     [Range(0, 6)]
-    [SerializeField] private int m_levelOfDetail;
+    [SerializeField] private int m_editorPreviewLOD;
 
     [Space, Header("Terrain")]
     [SerializeField] private TerrainType[] m_regions;
@@ -53,7 +53,7 @@ public class MapGenerator : MonoBehaviour
 
     public void DrawMapInEditor()
     {
-        var mapData = GenerateMapData();
+        var mapData = GenerateMapData(Vector2.zero);
 
         var display = FindObjectOfType<MapDisplay>();
         if (m_drawMode == EDrawMode.NoiseMap)
@@ -66,39 +66,39 @@ public class MapGenerator : MonoBehaviour
         }
         else if (m_drawMode == EDrawMode.Mesh)
         {
-            display.DrawMesh(MeshGenerator.GenerateTerrainMesh(mapData.m_heightMap, m_meshHeightMultiplier, m_meshHeightCurve, m_levelOfDetail),
+            display.DrawMesh(MeshGenerator.GenerateTerrainMesh(mapData.m_heightMap, m_meshHeightMultiplier, m_meshHeightCurve, m_editorPreviewLOD),
                 TextureGenerator.TextureFromColorMap(mapData.m_colorMap, MAP_CHUNK_SIZE, MAP_CHUNK_SIZE));
         }
     }
 
 
     #region Thread 사용
-    
-    public void RequestMapData(Action<MapData> callback)
+
+    public void RequestMapData(Vector2 center, Action<MapData> callback)
     {
-        ThreadStart threadStart = () => MapDataThread(callback);
+        ThreadStart threadStart = () => MapDataThread(center, callback);
 
         new Thread(threadStart).Start();
     }
-    private void MapDataThread(Action<MapData> callback)
+    private void MapDataThread(Vector2 center,Action<MapData> callback)
     {
-        var mapData = GenerateMapData();
+        var mapData = GenerateMapData(center);
         lock (m_mapDataThreadInfoQueue)
         {
             m_mapDataThreadInfoQueue.Enqueue(new MapThreadInfo<MapData>(callback, mapData));
         }
     }
 
-    public void RequestMeshData(MapData mapData, Action<MeshData> callback)
+    public void RequestMeshData(MapData mapData, int lod, Action<MeshData> callback)
     {
-        ThreadStart threadStart = () => MeshDataThread(mapData, callback);
+        ThreadStart threadStart = () => MeshDataThread(mapData, lod,callback);
 
         new Thread(threadStart).Start();
     }
 
-    private void MeshDataThread(MapData mapData, Action<MeshData> callback)
+    private void MeshDataThread(MapData mapData, int lod, Action<MeshData> callback)
     {
-        var meshData = MeshGenerator.GenerateTerrainMesh(mapData.m_heightMap, m_meshHeightMultiplier, m_meshHeightCurve, m_levelOfDetail);
+        var meshData = MeshGenerator.GenerateTerrainMesh(mapData.m_heightMap, m_meshHeightMultiplier, m_meshHeightCurve, lod);
         lock (m_meshDataThreadInfoQueue)
         {
             m_meshDataThreadInfoQueue.Enqueue(new MapThreadInfo<MeshData>(callback, meshData));
@@ -143,9 +143,10 @@ public class MapGenerator : MonoBehaviour
 
     #endregion
 
-    private MapData GenerateMapData()
+    private MapData GenerateMapData(Vector2 center)
     {
-        var noiseMap = Noise.GenerateNoiseMap(MAP_CHUNK_SIZE, MAP_CHUNK_SIZE, m_seed, m_noiseScale, m_octaves, m_persistance, m_lacunarity, m_offset);
+        var noiseMap = Noise.GenerateNoiseMap(
+            MAP_CHUNK_SIZE, MAP_CHUNK_SIZE, m_seed, m_noiseScale, m_octaves, m_persistance, m_lacunarity, center + m_offset);
 
         //Color Map 설정
         var colorMap = new Color[MAP_CHUNK_SIZE * MAP_CHUNK_SIZE];
