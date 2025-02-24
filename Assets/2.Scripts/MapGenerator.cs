@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class MapGenerator : MonoBehaviour
 {
+    const int MAP_CHUNK_SIZE = 241;
+
     private enum EDrawMode
     {
         NoiseMap,
@@ -12,8 +14,6 @@ public class MapGenerator : MonoBehaviour
     }
 
     [Header("Noise")]
-    [SerializeField] private int m_mapWidth;
-    [SerializeField] private int m_mapHeight;
     [SerializeField] private float m_noiseScale;
 
     [SerializeField] private int m_octaves;
@@ -23,6 +23,11 @@ public class MapGenerator : MonoBehaviour
 
     [SerializeField] private int m_seed;
     [SerializeField] private Vector2 m_offset;
+
+    [Header("LOD")]
+    [Tooltip("숫자가 작아질수록 디테일업")]
+    [Range(0, 6)]
+    [SerializeField] private int m_levelOfDetail;
 
     [Space, Header("Terrain")]
     [SerializeField] private TerrainType[] m_regions;
@@ -38,20 +43,20 @@ public class MapGenerator : MonoBehaviour
 
     public void GenerateMap()
     {
-        var noiseMap = Noise.GenerateNoiseMap(m_mapWidth, m_mapHeight, m_seed, m_noiseScale, m_octaves, m_persistance, m_lacunarity, m_offset);
+        var noiseMap = Noise.GenerateNoiseMap(MAP_CHUNK_SIZE, MAP_CHUNK_SIZE, m_seed, m_noiseScale, m_octaves, m_persistance, m_lacunarity, m_offset);
 
         //Color Map 설정
-        var colorMap = new Color[m_mapWidth * m_mapHeight];
-        for (int y = 0; y < m_mapHeight; y++)
+        var colorMap = new Color[MAP_CHUNK_SIZE * MAP_CHUNK_SIZE];
+        for (int y = 0; y < MAP_CHUNK_SIZE; y++)
         {
-            for (int x = 0; x < m_mapWidth; x++)
+            for (int x = 0; x < MAP_CHUNK_SIZE; x++)
             {
                 var currentHeight = noiseMap[x, y];
                 for (int i = 0; i < m_regions.Length; i++)
                 {
                     if (currentHeight <= m_regions[i].height)
                     {
-                        colorMap[y * m_mapWidth + x] = m_regions[i].color;
+                        colorMap[y * MAP_CHUNK_SIZE + x] = m_regions[i].color;
 
                         break;
                     }
@@ -67,24 +72,17 @@ public class MapGenerator : MonoBehaviour
         }
         else if(m_drawMode == EDrawMode.ColorMap)
         {
-            display.DrawTexture(TextureGenerator.TextureFromColorMap(colorMap, m_mapWidth, m_mapHeight));
+            display.DrawTexture(TextureGenerator.TextureFromColorMap(colorMap, MAP_CHUNK_SIZE, MAP_CHUNK_SIZE));
         }
         else if(m_drawMode == EDrawMode.Mesh)
         {
-            display.DrawMesh(MeshGenerator.GenerateTerrainMesh(noiseMap, m_meshHeightMultiplier, m_meshHeightCurve), TextureGenerator.TextureFromColorMap(colorMap, m_mapWidth, m_mapHeight));
+            display.DrawMesh(MeshGenerator.GenerateTerrainMesh(noiseMap, m_meshHeightMultiplier, m_meshHeightCurve, m_levelOfDetail), 
+                TextureGenerator.TextureFromColorMap(colorMap, MAP_CHUNK_SIZE, MAP_CHUNK_SIZE));
         }
     }
 
     private void OnValidate()
     {
-        if (m_mapWidth < 1)
-        {
-            m_mapWidth = 1;
-        }
-        if (m_mapHeight < 1)
-        {
-            m_mapHeight = 1;
-        }
         if (m_lacunarity < 1)
         {
             m_lacunarity = 1;

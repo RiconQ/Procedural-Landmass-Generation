@@ -12,7 +12,7 @@ public static class MeshGenerator
     /// </summary>
     /// <param name="heightMap">해당 위치의 높이(Terrain의 높낮이 데이터)</param>
     /// <returns>Mesh의 점, 삼각형, UV데이터를 담는 Class</returns>
-    public static MeshData GenerateTerrainMesh(float[,] heightMap, float heightMultiplier, AnimationCurve heightCurve)
+    public static MeshData GenerateTerrainMesh(float[,] heightMap, float heightMultiplier, AnimationCurve heightCurve, int levelOfDetail)
     {
         var width = heightMap.GetLength(0);
         var height = heightMap.GetLength(1);
@@ -20,20 +20,23 @@ public static class MeshGenerator
         var topLeftX = (width - 1) / -2f;
         var topLeftZ = (height - 1) / 2f;
 
+        var meshSimplificationIncrement = (levelOfDetail == 0) ? 1 : levelOfDetail * 2;
+        var verticePerLine = ((width - 1) / meshSimplificationIncrement) + 1;
 
-        var meshData = new MeshData(width, height);
+
+        var meshData = new MeshData(verticePerLine, verticePerLine);
         var vertexIndex = 0;
 
-        for (int y = 0; y < height; y++)
+        for (int y = 0; y < height; y += meshSimplificationIncrement)
         {
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < width; x += meshSimplificationIncrement)
             {
                 meshData.m_vertices[vertexIndex] = new Vector3(topLeftX + x, heightCurve.Evaluate(heightMap[x, y]) * heightMultiplier, topLeftZ - y);
                 meshData.m_uvs[vertexIndex] = new Vector2(x / (float)width, y / (float)height);
                 if (x < width - 1 && y < height - 1)
                 {
-                    meshData.AddTriangle(vertexIndex, vertexIndex + width + 1, vertexIndex + width);
-                    meshData.AddTriangle(vertexIndex + width + 1, vertexIndex, vertexIndex + 1);
+                    meshData.AddTriangle(vertexIndex, vertexIndex + verticePerLine + 1, vertexIndex + verticePerLine);
+                    meshData.AddTriangle(vertexIndex + verticePerLine + 1, vertexIndex, vertexIndex + 1);
                 }
 
                 vertexIndex++;
