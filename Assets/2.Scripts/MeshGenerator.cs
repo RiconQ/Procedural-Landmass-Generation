@@ -14,6 +14,7 @@ public static class MeshGenerator
     /// <returns>Mesh의 점, 삼각형, UV데이터를 담는 Class</returns>
     public static MeshData GenerateTerrainMesh(float[,] heightMap, float heightMultiplier, AnimationCurve heightCurve, int levelOfDetail)
     {
+        var tmpHeightCurve = new AnimationCurve(heightCurve.keys);
         var width = heightMap.GetLength(0);
         var height = heightMap.GetLength(1);
 
@@ -31,7 +32,10 @@ public static class MeshGenerator
         {
             for (int x = 0; x < width; x += meshSimplificationIncrement)
             {
-                meshData.m_vertices[vertexIndex] = new Vector3(topLeftX + x, heightCurve.Evaluate(heightMap[x, y]) * heightMultiplier, topLeftZ - y);
+
+                meshData.m_vertices[vertexIndex] =
+                    new Vector3(topLeftX + x, tmpHeightCurve.Evaluate(heightMap[x, y]) * heightMultiplier, topLeftZ - y);
+
                 meshData.m_uvs[vertexIndex] = new Vector2(x / (float)width, y / (float)height);
                 if (x < width - 1 && y < height - 1)
                 {

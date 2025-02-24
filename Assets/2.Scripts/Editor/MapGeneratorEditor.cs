@@ -23,14 +23,14 @@ public class MapGeneratorEditor : Editor
         {
             if(mapGen.AutoUpdate)
             {
-                mapGen.GenerateMap();
+                mapGen.DrawMapInEditor();
             }
         }
 
         // Generate 버튼추가, 클릭시 mapGen의 GenerateMap() 실행
         if(GUILayout.Button("Generate"))
         {
-            mapGen.GenerateMap();
+            mapGen.DrawMapInEditor();
         }
     }
 }
