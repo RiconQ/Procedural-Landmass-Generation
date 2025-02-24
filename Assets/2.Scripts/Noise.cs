@@ -1,7 +1,14 @@
+using System;
 using UnityEngine;
 
 public static class Noise
 {
+    public enum ENormalizeMode
+    {
+        Local,
+        Global
+    }
+
     /// <summary>
     /// float 2d array의 NoiseMap 생성 메서드
     /// </summary>
@@ -12,20 +19,28 @@ public static class Noise
     /// <param name="persistance"></param>
     /// <param name="lacunarity"></param>
     /// <returns>float 2D array형식의 Perlin Noise</returns>
-    public static float[,] GenerateNoiseMap(int mapWidth, int mapHeight, int seed, float scale, int octaves, float persistance, float lacunarity, Vector3 offset)
+    public static float[,] GenerateNoiseMap(
+        int mapWidth, int mapHeight, int seed, float scale, int octaves, float persistance, float lacunarity, Vector3 offset, ENormalizeMode normalizeMode)
     {
         var noiseMap = new float[mapWidth, mapHeight];
 
         //pseudo random number generator
         var prng = new System.Random(seed);
         var octaveOffsets = new Vector2[octaves];
+
+        var maxPossibleHeight = 0f;
+        var amplitude = 1f;
+        var frequency = 1f;
+
         for (int i = 0; i < octaves; i++)
         {
             var offsetX = prng.Next(-100000, 100000) + offset.x;
-            var offsetY = prng.Next(-100000, 100000) + offset.y;
+            var offsetY = prng.Next(-100000, 100000) - offset.y;
             octaveOffsets[i] = new Vector2(offsetX, offsetY);
-        }
 
+            maxPossibleHeight += amplitude;
+            amplitude *= persistance;
+        }
 
         //scale이 0보다 작거나 같다면 scale값 clamp
         if (scale <= 0)
@@ -33,8 +48,8 @@ public static class Noise
             scale = 0.0001f;
         }
 
-        var maxNoiseHeight = float.MinValue;
-        var minNoiseHeight = float.MaxValue;
+        var maxLocalNoiseHeight = float.MinValue;
+        var minLocalNoiseHeight = float.MaxValue;
 
         var halfWidth = mapWidth / 2f;
         var halfHieght = mapHeight / 2f;
@@ -43,8 +58,8 @@ public static class Noise
         {
             for (int x = 0; x < mapWidth; x++)
             {
-                var amplitude = 1f;
-                var frequency = 1f;
+                amplitude = 1f;
+                frequency = 1f;
                 var noiseHeight = 0f;
 
                 for (int i = 0; i < octaves; i++)
@@ -52,8 +67,8 @@ public static class Noise
                     //x, y값을 scale만큼 나눠서 non-integer value 구하기
                     //-> perlin noise는 정수값이 들어오면 항상 같은 값을 반환하기 때문
                     //frequency만큼 곱하여 주파수를 조절하고 octaveOffsets만큼 더해서 시드 반영
-                    float sampleX = (x - halfWidth) / scale * frequency + octaveOffsets[i].x;
-                    float sampleY = (y - halfHieght) / scale * frequency + octaveOffsets[i].y;
+                    float sampleX = (x - halfWidth + octaveOffsets[i].x) / scale * frequency;
+                    float sampleY = (y - halfHieght + octaveOffsets[i].y) / scale * frequency;
 
                     //단순히 perlinNoise를 사용하면 평균값이 0.5라서 너무 밝음
                     // *2-1을 하여 범위를 -1 ~ 1로 변환 ->평균이 0이됨
@@ -73,13 +88,13 @@ public static class Noise
                 }
 
                 // 노이즈 최소, 최댓값을 갱신하여 정규화에 사용
-                if (noiseHeight > maxNoiseHeight)
+                if (noiseHeight > maxLocalNoiseHeight)
                 {
-                    maxNoiseHeight = noiseHeight;
+                    maxLocalNoiseHeight = noiseHeight;
                 }
-                else if (noiseHeight < minNoiseHeight)
+                else if (noiseHeight < minLocalNoiseHeight)
                 {
-                    minNoiseHeight = noiseHeight;
+                    minLocalNoiseHeight = noiseHeight;
                 }
 
                 noiseMap[x, y] = noiseHeight;
@@ -90,8 +105,16 @@ public static class Noise
         {
             for (int x = 0; x < mapWidth; x++)
             {
-                //min, max 사이의 값을 0~1범위로 정규화
-                noiseMap[x, y] = Mathf.InverseLerp(minNoiseHeight, maxNoiseHeight, noiseMap[x, y]);
+                if (normalizeMode == ENormalizeMode.Local)
+                {
+                    //min, max 사이의 값을 0~1범위로 정규화
+                    noiseMap[x, y] = Mathf.InverseLerp(minLocalNoiseHeight, maxLocalNoiseHeight, noiseMap[x, y]);
+                }
+                else
+                {
+                    var normalizedHeight = (noiseMap[x, y] + 1) / maxPossibleHeight;
+                    noiseMap[x, y] = Mathf.Clamp(normalizedHeight, 0, int.MaxValue);
+                }
             }
         }
         return noiseMap;

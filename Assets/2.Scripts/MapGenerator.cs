@@ -27,6 +27,7 @@ public class MapGenerator : MonoBehaviour
 
     [SerializeField] private int m_seed;
     [SerializeField] private Vector2 m_offset;
+    [SerializeField] private Noise.ENormalizeMode m_normalizeMode;
 
     [Header("LOD")]
     [Tooltip("숫자가 작아질수록 디테일업")]
@@ -80,7 +81,7 @@ public class MapGenerator : MonoBehaviour
 
         new Thread(threadStart).Start();
     }
-    private void MapDataThread(Vector2 center,Action<MapData> callback)
+    private void MapDataThread(Vector2 center, Action<MapData> callback)
     {
         var mapData = GenerateMapData(center);
         lock (m_mapDataThreadInfoQueue)
@@ -91,7 +92,7 @@ public class MapGenerator : MonoBehaviour
 
     public void RequestMeshData(MapData mapData, int lod, Action<MeshData> callback)
     {
-        ThreadStart threadStart = () => MeshDataThread(mapData, lod,callback);
+        ThreadStart threadStart = () => MeshDataThread(mapData, lod, callback);
 
         new Thread(threadStart).Start();
     }
@@ -146,7 +147,7 @@ public class MapGenerator : MonoBehaviour
     private MapData GenerateMapData(Vector2 center)
     {
         var noiseMap = Noise.GenerateNoiseMap(
-            MAP_CHUNK_SIZE, MAP_CHUNK_SIZE, m_seed, m_noiseScale, m_octaves, m_persistance, m_lacunarity, center + m_offset);
+            MAP_CHUNK_SIZE, MAP_CHUNK_SIZE, m_seed, m_noiseScale, m_octaves, m_persistance, m_lacunarity, center + m_offset, m_normalizeMode);
 
         //Color Map 설정
         var colorMap = new Color[MAP_CHUNK_SIZE * MAP_CHUNK_SIZE];
@@ -157,10 +158,12 @@ public class MapGenerator : MonoBehaviour
                 var currentHeight = noiseMap[x, y];
                 for (int i = 0; i < m_regions.Length; i++)
                 {
-                    if (currentHeight <= m_regions[i].height)
+                    if (currentHeight >= m_regions[i].height)
                     {
                         colorMap[y * MAP_CHUNK_SIZE + x] = m_regions[i].color;
-
+                    }
+                    else
+                    {
                         break;
                     }
                 }
