@@ -9,15 +9,15 @@ public class MapGenerator : MonoBehaviour
 {
     public const int MAP_CHUNK_SIZE = 241;
 
-    private enum EDrawMode
+    private enum DrawMode
     {
         NoiseMap,
         ColorMap,
-        Mesh
+        Mesh,
+        FalloffMap
     }
 
     #region Inspector Variables
-    [Header("Noise")]
     [SerializeField] private float m_noiseScale;
 
     [SerializeField] private int m_octaves;
@@ -29,21 +29,26 @@ public class MapGenerator : MonoBehaviour
     [SerializeField] private Vector2 m_offset;
     [SerializeField] private Noise.ENormalizeMode m_normalizeMode;
 
-    [Header("LOD")]
-    [Tooltip("¼ýÀÚ°¡ ÀÛ¾ÆÁú¼ö·Ï µðÅ×ÀÏ¾÷")]
+    [Space(20)]
+    [Tooltip("ìˆ«ìžê°€ ìž‘ì•„ì§ˆìˆ˜ë¡ ë””í…Œì¼ì—…")]
     [Range(0, 6)]
     [SerializeField] private int m_editorPreviewLOD;
 
-    [Space, Header("Terrain")]
+    [Space(20)]
     [SerializeField] private TerrainType[] m_regions;
 
-    [Space, Header("Mesh")]
+    [Space(20)]
     [SerializeField] private float m_meshHeightMultiplier;
     [SerializeField] private AnimationCurve m_meshHeightCurve;
 
-    [Space, Header("Editor")]
+    [Space(20)]
     [SerializeField] private bool m_autoUpdate = true;
-    [SerializeField] private EDrawMode m_drawMode;
+    [SerializeField] private DrawMode m_drawMode;
+
+    [Space(20)]
+    [SerializeField] private bool m_useFalloff;
+    private float[,] m_falloffMap;
+
     public bool AutoUpdate => m_autoUpdate;
     #endregion
 
@@ -51,29 +56,57 @@ public class MapGenerator : MonoBehaviour
     private Queue<MapThreadInfo<MapData>> m_mapDataThreadInfoQueue = new Queue<MapThreadInfo<MapData>>();
     private Queue<MapThreadInfo<MeshData>> m_meshDataThreadInfoQueue = new Queue<MapThreadInfo<MeshData>>();
 
+    private void Awake()
+    {
+        m_falloffMap = FalloffGenerator.GenerateFalloffMap(MAP_CHUNK_SIZE);
+    }
+    private void Update()
+    {
+        if (m_mapDataThreadInfoQueue.Count > 0)
+        {
+            for (int i = 0; i < m_mapDataThreadInfoQueue.Count; i++)
+            {
+                var threadInfo = m_mapDataThreadInfoQueue.Dequeue();
+                threadInfo.m_callback(threadInfo.m_parameter);
+            }
+        }
+
+        if (m_meshDataThreadInfoQueue.Count > 0)
+        {
+            for (int i = 0; i < m_meshDataThreadInfoQueue.Count; i++)
+            {
+                var threadInfo = m_meshDataThreadInfoQueue.Dequeue();
+                threadInfo.m_callback(threadInfo.m_parameter);
+            }
+        }
+    }
 
     public void DrawMapInEditor()
     {
         var mapData = GenerateMapData(Vector2.zero);
 
         var display = FindObjectOfType<MapDisplay>();
-        if (m_drawMode == EDrawMode.NoiseMap)
+        if (m_drawMode == DrawMode.NoiseMap)
         {
             display.DrawTexture(TextureGenerator.TextureFromHeightMap(mapData.m_heightMap));
         }
-        else if (m_drawMode == EDrawMode.ColorMap)
+        else if (m_drawMode == DrawMode.ColorMap)
         {
             display.DrawTexture(TextureGenerator.TextureFromColorMap(mapData.m_colorMap, MAP_CHUNK_SIZE, MAP_CHUNK_SIZE));
         }
-        else if (m_drawMode == EDrawMode.Mesh)
+        else if (m_drawMode == DrawMode.Mesh)
         {
             display.DrawMesh(MeshGenerator.GenerateTerrainMesh(mapData.m_heightMap, m_meshHeightMultiplier, m_meshHeightCurve, m_editorPreviewLOD),
                 TextureGenerator.TextureFromColorMap(mapData.m_colorMap, MAP_CHUNK_SIZE, MAP_CHUNK_SIZE));
         }
+        else if (m_drawMode == DrawMode.FalloffMap)
+        {
+            display.DrawTexture(TextureGenerator.TextureFromHeightMap(FalloffGenerator.GenerateFalloffMap(MAP_CHUNK_SIZE)));
+        }
     }
 
 
-    #region Thread »ç¿ë
+    #region Thread ì‚¬ìš©
 
     public void RequestMapData(Vector2 center, Action<MapData> callback)
     {
@@ -105,30 +138,9 @@ public class MapGenerator : MonoBehaviour
             m_meshDataThreadInfoQueue.Enqueue(new MapThreadInfo<MeshData>(callback, meshData));
         }
     }
-
-    private void Update()
-    {
-        if (m_mapDataThreadInfoQueue.Count > 0)
-        {
-            for (int i = 0; i < m_mapDataThreadInfoQueue.Count; i++)
-            {
-                var threadInfo = m_mapDataThreadInfoQueue.Dequeue();
-                threadInfo.m_callback(threadInfo.m_parameter);
-            }
-        }
-
-        if (m_meshDataThreadInfoQueue.Count > 0)
-        {
-            for (int i = 0; i < m_meshDataThreadInfoQueue.Count; i++)
-            {
-                var threadInfo = m_meshDataThreadInfoQueue.Dequeue();
-                threadInfo.m_callback(threadInfo.m_parameter);
-            }
-        }
-    }
     #endregion
 
-    #region Unitask »ç¿ë
+    #region Unitask ì‚¬ìš©
     /*
     public async UniTask<MapData> RequestMapData()
     {
@@ -149,12 +161,16 @@ public class MapGenerator : MonoBehaviour
         var noiseMap = Noise.GenerateNoiseMap(
             MAP_CHUNK_SIZE, MAP_CHUNK_SIZE, m_seed, m_noiseScale, m_octaves, m_persistance, m_lacunarity, center + m_offset, m_normalizeMode);
 
-        //Color Map ¼³Á¤
+        //Color Map ì„¤ì •
         var colorMap = new Color[MAP_CHUNK_SIZE * MAP_CHUNK_SIZE];
         for (int y = 0; y < MAP_CHUNK_SIZE; y++)
         {
             for (int x = 0; x < MAP_CHUNK_SIZE; x++)
             {
+                if (m_useFalloff)
+                {
+                    noiseMap[x, y] = Mathf.Clamp01(noiseMap[x, y] - m_falloffMap[x, y]);
+                }
                 var currentHeight = noiseMap[x, y];
                 for (int i = 0; i < m_regions.Length; i++)
                 {
@@ -183,6 +199,8 @@ public class MapGenerator : MonoBehaviour
         {
             m_octaves = 0;
         }
+
+        m_falloffMap = FalloffGenerator.GenerateFalloffMap(MAP_CHUNK_SIZE);
     }
 
     private struct MapThreadInfo<T>
