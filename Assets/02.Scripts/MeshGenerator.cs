@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 
 /// <summary>
@@ -94,9 +95,11 @@ public class MeshData
 
     private int m_triangleIndex;
     private int m_borderTriangleIndex;
+    private bool m_useFlatShading;
 
-    public MeshData(int verticesPerLine)
+    public MeshData(int verticesPerLine, bool useFlatShading)
     {
+        this.m_useFlatShading = useFlatShading;
         m_vertices = new Vector3[verticesPerLine * verticesPerLine];
         m_uvs = new Vector2[verticesPerLine * verticesPerLine];
         m_triangles = new int[(verticesPerLine - 1) * (verticesPerLine - 1) * 6];
@@ -197,10 +200,26 @@ public class MeshData
 
         return Vector3.Cross(sideAB, sideAC);
     }
-    
+
     public void BakedNormals()
     {
         m_bakedNormals = CalculateNormals();
+    }
+
+    private void FlatShading()
+    {
+        var flatShadedVertices = new Vector3[m_triangles.Length];
+        var flatShadedUvs = new Vector2[m_triangles.Length];
+
+        for (int i = 0; i < m_triangles.Length; i++)
+        {
+            flatShadedVertices[i] = m_vertices[m_triangles[i]];
+            flatShadedUvs[i] = m_uvs[m_triangles[i]];
+            m_triangles[i] = i;
+        }
+
+        m_vertices = flatShadedVertices;
+        m_uvs = flatShadedUvs;
     }
 
     public Mesh CreateMesh()
